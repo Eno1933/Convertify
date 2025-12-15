@@ -25,6 +25,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Variables
     let images = [];
+    
+    // Variables untuk pratinjau
+    let previewModal = null;
+    let currentPreviewPage = 1;
+    let zoomLevel = 1.0;
+    let previewPages = [];
     let dragSrcEl = null;
     
     // Page size mappings
@@ -362,8 +368,19 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        showNotification('Fitur pratinjau akan segera hadir', 'info');
+        showPreview();
     });
+    
+    // Event listener untuk tombol convert dari preview
+    const convertFromPreviewBtn = document.getElementById('convertFromPreview');
+    if (convertFromPreviewBtn) {
+        convertFromPreviewBtn.addEventListener('click', function() {
+            if (previewModal) {
+                previewModal.hide();
+            }
+            convertToPDF();
+        });
+    }
     
     // Event listener untuk tombol convert
     convertBtn.addEventListener('click', convertToPDF);
@@ -493,6 +510,308 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // ============================
+    // FUNGSI PRATINJAU
+    // ============================
+    
+    // Fungsi untuk menampilkan pratinjau
+    async function showPreview() {
+        if (images.length === 0) return;
+        
+        // Reset state pratinjau
+        currentPreviewPage = 1;
+        zoomLevel = 1.0;
+        previewPages = [];
+        
+        // Tampilkan modal
+        if (previewModal) {
+            previewModal.show();
+        }
+        
+        // Tampilkan loading state
+        const previewWrapper = document.getElementById('previewWrapper');
+        if (previewWrapper) {
+            previewWrapper.innerHTML = `
+                <div class="preview-loading">
+                    <div class="spinner"></div>
+                    <p>Membuat pratinjau...</p>
+                </div>
+            `;
+        }
+        
+        try {
+            // Dapatkan pengaturan
+            const pageSize = pageSizeSelect.value;
+            const orientation = pageOrientationSelect.value;
+            const margins = {
+                top: parseInt(marginTopInput.value) || 10,
+                bottom: parseInt(marginBottomInput.value) || 10,
+                left: parseInt(marginLeftInput.value) || 10,
+                right: parseInt(marginRightInput.value) || 10
+            };
+            
+            // Dapatkan dimensi halaman dalam mm
+            const pageSizeMM = pageSizes[pageSize];
+            let pageWidthMM = pageSizeMM.width;
+            let pageHeightMM = pageSizeMM.height;
+            
+            // Sesuaikan dengan orientasi
+            if (orientation === 'landscape') {
+                [pageWidthMM, pageHeightMM] = [pageHeightMM, pageWidthMM];
+            }
+            
+            // Konversi mm ke pixel (1mm = 3.7795275591 pixel)
+            const mmToPx = 3.7795275591;
+            const pageWidthPx = pageWidthMM * mmToPx;
+            const pageHeightPx = pageHeightMM * mmToPx;
+            
+            // Area konten setelah margin
+            const contentWidthMM = pageWidthMM - margins.left - margins.right;
+            const contentHeightMM = pageHeightMM - margins.top - margins.bottom;
+            const contentWidthPx = contentWidthMM * mmToPx;
+            const contentHeightPx = contentHeightMM * mmToPx;
+            
+            // Buat pratinjau untuk setiap gambar
+            for (let i = 0; i < images.length; i++) {
+                const img = new Image();
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                    img.src = images[i].url;
+                });
+                
+                // Hitung skala untuk gambar
+                const imgWidth = img.width;
+                const imgHeight = img.height;
+                
+                let width = contentWidthPx;
+                let height = (imgHeight * width) / imgWidth;
+                
+                // Jika gambar terlalu tinggi, sesuaikan dengan tinggi konten
+                if (height > contentHeightPx) {
+                    height = contentHeightPx;
+                    width = (imgWidth * height) / imgHeight;
+                }
+                
+                // Hitung posisi tengah
+                const marginLeftPx = margins.left * mmToPx;
+                const marginTopPx = margins.top * mmToPx;
+                const x = marginLeftPx + (contentWidthPx - width) / 2;
+                const y = marginTopPx + (contentHeightPx - height) / 2;
+                
+                // Buat canvas untuk halaman
+                const pageCanvas = document.createElement('canvas');
+                pageCanvas.width = pageWidthPx;
+                pageCanvas.height = pageHeightPx;
+                const ctx = pageCanvas.getContext('2d');
+                
+                // Fill background putih
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, pageWidthPx, pageHeightPx);
+                
+                // Gambar margin area (hanya untuk visual)
+                ctx.strokeStyle = 'rgba(67, 97, 238, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 5]);
+                ctx.strokeRect(
+                    marginLeftPx,
+                    marginTopPx,
+                    contentWidthPx,
+                    contentHeightPx
+                );
+                ctx.setLineDash([]);
+                
+                // Gambar gambar
+                ctx.drawImage(img, x, y, width, height);
+                
+                // Tambahkan nomor halaman
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'right';
+                ctx.fillText(`Halaman ${i + 1}`, pageWidthPx - 20, pageHeightPx - 20);
+                
+                // Simpan data halaman
+                previewPages.push({
+                    canvas: pageCanvas,
+                    dataUrl: pageCanvas.toDataURL('image/png'),
+                    width: pageWidthPx,
+                    height: pageHeightPx
+                });
+            }
+            
+            // Render pratinjau
+            renderPreview();
+            
+            // Setup event listeners untuk kontrol pratinjau
+            setupPreviewControls();
+            
+        } catch (error) {
+            console.error('Error creating preview:', error);
+            if (previewWrapper) {
+                previewWrapper.innerHTML = `
+                    <div class="preview-loading">
+                        <i class="bi bi-exclamation-triangle" style="font-size: 3rem; color: var(--danger);"></i>
+                        <p class="mt-2">Gagal membuat pratinjau. Silakan coba lagi.</p>
+                    </div>
+                `;
+            }
+            showNotification('Gagal membuat pratinjau', 'error');
+        }
+    }
+    
+    // Fungsi untuk merender pratinjau
+    function renderPreview() {
+        const previewWrapper = document.getElementById('previewWrapper');
+        if (!previewWrapper || previewPages.length === 0) return;
+        
+        // Update informasi halaman
+        document.getElementById('pageNum').textContent = currentPreviewPage;
+        document.getElementById('totalPages').textContent = previewPages.length;
+        
+        // Clear wrapper
+        previewWrapper.innerHTML = '';
+        
+        // Buat kontainer untuk halaman
+        const pageContainer = document.createElement('div');
+        pageContainer.className = 'page-preview';
+        
+        // Atur ukuran berdasarkan zoom
+        const currentPage = previewPages[currentPreviewPage - 1];
+        const displayWidth = currentPage.width * zoomLevel;
+        const displayHeight = currentPage.height * zoomLevel;
+        
+        pageContainer.style.width = `${displayWidth}px`;
+        pageContainer.style.height = `${displayHeight}px`;
+        
+        // Buat gambar untuk pratinjau
+        const img = document.createElement('img');
+        img.src = currentPage.dataUrl;
+        img.alt = `Halaman ${currentPreviewPage}`;
+        img.style.width = '100%';
+        img.style.height = '100%';
+        img.style.objectFit = 'contain';
+        
+        pageContainer.appendChild(img);
+        previewWrapper.appendChild(pageContainer);
+        
+        // Update status tombol navigasi
+        updatePreviewNavigation();
+    }
+    
+    // Fungsi untuk setup kontrol pratinjau
+    function setupPreviewControls() {
+        // Zoom controls
+        document.getElementById('zoomOut')?.addEventListener('click', () => {
+            zoomLevel = Math.max(0.25, zoomLevel - 0.25);
+            renderPreview();
+        });
+        
+        document.getElementById('zoomIn')?.addEventListener('click', () => {
+            zoomLevel = Math.min(3.0, zoomLevel + 0.25);
+            renderPreview();
+        });
+        
+        document.getElementById('zoomReset')?.addEventListener('click', () => {
+            zoomLevel = 1.0;
+            renderPreview();
+        });
+        
+        // Page navigation
+        document.getElementById('prevPage')?.addEventListener('click', () => {
+            if (currentPreviewPage > 1) {
+                currentPreviewPage--;
+                renderPreview();
+            }
+        });
+        
+        document.getElementById('nextPage')?.addEventListener('click', () => {
+            if (currentPreviewPage < previewPages.length) {
+                currentPreviewPage++;
+                renderPreview();
+            }
+        });
+        
+        // Keyboard navigation
+        document.addEventListener('keydown', handlePreviewKeyboard);
+        
+        // Clean up event listener saat modal ditutup
+        const modalElement = document.getElementById('previewModal');
+        if (modalElement) {
+            modalElement.addEventListener('hidden.bs.modal', () => {
+                document.removeEventListener('keydown', handlePreviewKeyboard);
+            });
+        }
+    }
+    
+    // Fungsi untuk handle keyboard navigation
+    function handlePreviewKeyboard(e) {
+        if (!previewModal || !previewModal._isShown) return;
+        
+        switch(e.key) {
+            case 'ArrowLeft':
+                if (currentPreviewPage > 1) {
+                    currentPreviewPage--;
+                    renderPreview();
+                    e.preventDefault();
+                }
+                break;
+            case 'ArrowRight':
+                if (currentPreviewPage < previewPages.length) {
+                    currentPreviewPage++;
+                    renderPreview();
+                    e.preventDefault();
+                }
+                break;
+            case '-':
+                zoomLevel = Math.max(0.25, zoomLevel - 0.25);
+                renderPreview();
+                e.preventDefault();
+                break;
+            case '+':
+            case '=':
+                zoomLevel = Math.min(3.0, zoomLevel + 0.25);
+                renderPreview();
+                e.preventDefault();
+                break;
+            case '0':
+                zoomLevel = 1.0;
+                renderPreview();
+                e.preventDefault();
+                break;
+            case 'Escape':
+                if (previewModal) {
+                    previewModal.hide();
+                }
+                break;
+        }
+    }
+    
+    // Fungsi untuk update status navigasi pratinjau
+    function updatePreviewNavigation() {
+        const prevBtn = document.getElementById('prevPage');
+        const nextBtn = document.getElementById('nextPage');
+        
+        if (prevBtn) {
+            prevBtn.disabled = currentPreviewPage <= 1;
+            prevBtn.classList.toggle('disabled', currentPreviewPage <= 1);
+        }
+        
+        if (nextBtn) {
+            nextBtn.disabled = currentPreviewPage >= previewPages.length;
+            nextBtn.classList.toggle('disabled', currentPreviewPage >= previewPages.length);
+        }
+        
+        // Update teks zoom
+        const zoomResetBtn = document.getElementById('zoomReset');
+        if (zoomResetBtn) {
+            zoomResetBtn.textContent = `${Math.round(zoomLevel * 100)}%`;
+        }
+    }
+    
+    // ============================
+    // FUNGSI UTILITAS
+    // ============================
+    
     // Fungsi untuk menampilkan notifikasi
     function showNotification(message, type = 'info') {
         // Hapus notifikasi sebelumnya jika ada
@@ -580,5 +899,11 @@ document.addEventListener('DOMContentLoaded', function() {
         tooltipTriggerList.map(function (tooltipTriggerEl) {
             return new bootstrap.Tooltip(tooltipTriggerEl);
         });
+    }
+
+    // Initialize preview modal
+    const previewModalElement = document.getElementById('previewModal');
+    if (previewModalElement) {
+        previewModal = new bootstrap.Modal(previewModalElement);
     }
 });

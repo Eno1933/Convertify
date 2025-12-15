@@ -41,7 +41,8 @@
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
                         <a class="btn btn-outline-primary" href="index.html">
-                            Kembali ke Home
+                            <i class="bi bi-house me-2"></i>
+                            Home
                         </a>
                     </li>
                 </ul>
@@ -60,7 +61,8 @@
                             <i class="bi bi-magic me-2"></i>
                             Konversi Gambar ke PDF
                         </h1>
-                        <p class="converter-subtitle">Unggah gambar PNG atau JPG dan konversi ke PDF dalam hitungan detik</p>
+                        <p class="converter-subtitle">Unggah gambar PNG atau JPG dan konversi ke PDF dalam hitungan
+                            detik</p>
                         <div class="d-flex flex-wrap gap-2 justify-content-center mt-3">
                             <div class="badge-converter">
                                 <i class="bi bi-shield-check me-1"></i> 100% Aman
@@ -112,7 +114,7 @@
                                 <i class="bi bi-gear me-2"></i>
                                 Pengaturan PDF
                             </h5>
-                            
+
                             <div class="row g-4">
                                 <!-- PDF Name -->
                                 <div class="col-md-6">
@@ -122,8 +124,8 @@
                                             Nama File PDF
                                         </label>
                                         <div class="input-group">
-                                            <input type="text" class="form-control" id="pdfName" 
-                                                   value="convertify-document" placeholder="Masukkan nama file">
+                                            <input type="text" class="form-control" id="pdfName"
+                                                value="convertify-document" placeholder="Masukkan nama file">
                                             <span class="input-group-text">.pdf</span>
                                         </div>
                                     </div>
@@ -186,19 +188,23 @@
                                         <div class="row g-3">
                                             <div class="col-6 col-md-3">
                                                 <label class="form-label small">Atas</label>
-                                                <input type="number" class="form-control" id="marginTop" value="10" min="0" max="50">
+                                                <input type="number" class="form-control" id="marginTop" value="10"
+                                                    min="0" max="50">
                                             </div>
                                             <div class="col-6 col-md-3">
                                                 <label class="form-label small">Bawah</label>
-                                                <input type="number" class="form-control" id="marginBottom" value="10" min="0" max="50">
+                                                <input type="number" class="form-control" id="marginBottom" value="10"
+                                                    min="0" max="50">
                                             </div>
                                             <div class="col-6 col-md-3">
                                                 <label class="form-label small">Kiri</label>
-                                                <input type="number" class="form-control" id="marginLeft" value="10" min="0" max="50">
+                                                <input type="number" class="form-control" id="marginLeft" value="10"
+                                                    min="0" max="50">
                                             </div>
                                             <div class="col-6 col-md-3">
                                                 <label class="form-label small">Kanan</label>
-                                                <input type="number" class="form-control" id="marginRight" value="10" min="0" max="50">
+                                                <input type="number" class="form-control" id="marginRight" value="10"
+                                                    min="0" max="50">
                                             </div>
                                         </div>
                                     </div>
@@ -286,6 +292,77 @@
                 </div>
             </div>
         </div>
+        <!-- Preview Modal -->
+        <div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="previewModalLabel">
+                            <i class="bi bi-eye me-2"></i>
+                            Pratinjau PDF
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="preview-controls mb-4">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-3">Zoom:</span>
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" id="zoomOut">
+                                                <i class="bi bi-zoom-out"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                                id="zoomReset">
+                                                100%
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" id="zoomIn">
+                                                <i class="bi bi-zoom-in"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <div class="d-flex align-items-center justify-content-end">
+                                        <span class="me-3">Halaman:</span>
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                                id="prevPage">
+                                                <i class="bi bi-chevron-left"></i>
+                                            </button>
+                                            <span class="btn btn-outline-secondary btn-sm disabled" id="currentPage">
+                                                <span id="pageNum">1</span> / <span id="totalPages">1</span>
+                                            </span>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                                id="nextPage">
+                                                <i class="bi bi-chevron-right"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="preview-container">
+                            <div class="preview-wrapper" id="previewWrapper">
+                                <!-- Preview halaman akan dimuat di sini -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle me-2"></i>
+                            Tutup
+                        </button>
+                        <button type="button" class="btn btn-primary" id="convertFromPreview">
+                            <i class="bi bi-file-earmark-pdf me-2"></i>
+                            Konversi Sekarang
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <!-- Footer -->
@@ -305,7 +382,7 @@
                         &copy; 2023 Convertofy. All rights reserved.
                     </p>
                     <a href="index.html" class="btn btn-sm btn-link mt-2">
-                        <i class="bi bi-arrow-left me-1"></i> Kembali ke Home
+                        <i class="bi bi-arrow-left me-1"></i> Home
                     </a>
                 </div>
             </div>
